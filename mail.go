@@ -225,7 +225,8 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// If body is HTML, convert it to text.
 	if len(m.Body) == 0 && len(m.HTML) > 0 {
-		m.Body, _ = html2text.FromString(m.HTML)
+		m.Body, err := html2text.FromString(m.HTML)
+		return nil, err
 	}
 
 	return m, nil
@@ -311,7 +312,10 @@ func (m *Message) Send() error {
 	if err != nil {
 		return fmt.Errorf("marshall body: %v", err)
 	}
-	return smtp.SendMail("127.0.0.1:25", nil, m.From, m.To, b)
+	var recv []string
+	recv = append(recv, m.To...)
+	recv = append(recv, m.CC...)
+	return smtp.SendMail("127.0.0.1:25", nil, m.From, recv, b)
 }
 
 // Marshall builds a textual representation of a message with headers and quoted-printable body.
