@@ -225,7 +225,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// If body is HTML, convert it to text.
 	if len(m.Body) == 0 && len(m.HTML) > 0 {
-		m.Body, err := html2text.FromString(m.HTML)
+		m.Body, err = html2text.FromString(m.HTML)
 		return nil, err
 	}
 
