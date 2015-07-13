@@ -220,13 +220,15 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// Decode body.
 	if err := m.decodeBody(bytes.NewReader(body), textproto.MIMEHeader(rawheaders)); err != nil {
-		return m, fmt.Errorf("decode body: %v", err)
+		return nil, fmt.Errorf("decode body: %v", err)
 	}
 
 	// If body is HTML, convert it to text.
 	if len(m.Body) == 0 && len(m.HTML) > 0 {
 		m.Body, err = html2text.FromString(m.HTML)
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return m, nil
