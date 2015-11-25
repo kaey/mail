@@ -543,7 +543,7 @@ func decodeHeader(rawheader string) (string, error) {
 
 type nonAsciiTransformer struct{}
 
-// Transform replaces non-ascii symbols (>127) for quotedprintable and base64.
+// Transform removes non-ascii symbols (>127) for quotedprintable and base64.
 func (t nonAsciiTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	i := 0
 	j := 0
@@ -562,7 +562,7 @@ func (t nonAsciiTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc 
 	// Append \n to the end of stream.
 	if atEOF {
 		if j == len(dst) {
-			return len(src), len(src), transform.ErrShortDst
+			return j, i, transform.ErrShortDst
 		}
 		dst[len(src)] = '\n'
 	}
