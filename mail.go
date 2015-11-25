@@ -182,21 +182,6 @@ func ReadMessage(r io.Reader) (*Message, error) {
 		m.ReturnPath = m.From
 	}
 
-	// TODO: use text.Transform to replace invalid symbols
-	// with spaces for both base64 and quoted-printable.
-	if m.From == "helpdesk@ttk.ru" {
-		for i := range body {
-			if body[i] == 0xbb {
-				body[i] = ' '
-			}
-		}
-	}
-
-	// Add missing \n to body. Go's quoted-printable decoder requires this.
-	if body[len(body)-1] != '\n' {
-		body = append(body, '\n')
-	}
-
 	// Decode rest of the headers.
 	headers := make(map[string]string)
 	for k, v := range rawheaders {
@@ -556,6 +541,38 @@ func decodeHeader(rawheader string) (string, error) {
 	return header, nil
 }
 
+type nonAsciiTransformer struct{}
+
+// Transform replaces non-ascii symbols (>127) for quotedprintable and base64.
+func (t nonAsciiTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	i := 0
+	j := 0
+	for i = 0; i < len(src) && j < len(dst); i++ {
+		if src[i] > 127 {
+			continue
+		}
+		dst[j] = src[i]
+		j++
+	}
+
+	if i != len(src) {
+		return j, i, transform.ErrShortDst
+	}
+
+	// Append \n to the end of stream.
+	if atEOF {
+		if j == len(dst) {
+			return len(src), len(src), transform.ErrShortDst
+		}
+		dst[len(src)] = '\n'
+	}
+
+	return j, i, nil
+}
+
+// Reset is noop.
+func (t nonAsciiTransformer) Reset() {}
+
 // FailReader returns error on first read.
 type failReader struct {
 	err error
@@ -570,9 +587,9 @@ func (r failReader) Read(b []byte) (n int, err error) {
 func decodeTransfer(r io.Reader, label string) io.Reader {
 	switch label {
 	case "base64", "Base64", "BASE64":
-		return base64.NewDecoder(base64.StdEncoding, r)
+		return base64.NewDecoder(base64.StdEncoding, transform.NewReader(r, nonAsciiTransformer{}))
 	case "quoted-printable", "Quoted-Printable", "QUOTED-PRINTABLE":
-		return quotedprintable.NewReader(r)
+		return quotedprintable.NewReader(transform.NewReader(r, nonAsciiTransformer{}))
 	case "", "7bit", "7Bit", "7BIT", "8bit", "8Bit", "8BIT", "binary", "Binary", "BINARY":
 		return r
 	default:
