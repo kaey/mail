@@ -66,6 +66,7 @@ type Message struct {
 	CC         []string
 	Subject    string
 	Date       time.Time
+	IsHTML     bool
 	HTML       string
 	Body       string
 	Parts      []Part
@@ -214,6 +215,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
+		m.IsHTML = true
 	}
 
 	return m, nil
