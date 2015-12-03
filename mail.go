@@ -206,7 +206,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	emptyBody := true
 	for _, r := range m.Body {
-		if unicode.IsGraphic(r) && !unicode.IsLetter(r) {
+		if unicode.IsGraphic(r) && !unicode.IsSpace(r) {
 			emptyBody = false
 			break
 		}
