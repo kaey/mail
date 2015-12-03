@@ -172,11 +172,6 @@ func ReadMessage(r io.Reader) (*Message, error) {
 		m.CC = make([]string, 0)
 	}
 
-	// Reject messages without "from" header.
-	if m.From == "" {
-		return nil, fmt.Errorf("header From not found in message")
-	}
-
 	// If return-path is unset, set it using from.
 	if m.ReturnPath == "" {
 		m.ReturnPath = m.From
