@@ -409,12 +409,20 @@ func (m *Message) decodeBody(r io.Reader, h textproto.MIMEHeader) error {
 	}
 
 	if ct == "text/plain" || ct == "text/html" {
-		data, err := ioutil.ReadAll(decodeTransfer(r, h.Get("Content-Transfer-Encoding")))
-		if err != nil {
-			return fmt.Errorf("read body: %v", err)
+		buf := new(bytes.Buffer)
+		for {
+			data, err := ioutil.ReadAll(decodeTransfer(r, h.Get("Content-Transfer-Encoding")))
+			buf.Write(data)
+			if err != nil {
+				if _, ok := err.(base64.CorruptInputError); ok {
+					continue
+				}
+				return fmt.Errorf("read body: %v", err)
+			}
+			break
 		}
 
-		body, err := decodeCharset(string(data), ctp["charset"])
+		body, err := decodeCharset(buf.String(), ctp["charset"])
 		if err != nil {
 			return fmt.Errorf("charsetDecode: %v", err)
 		}
@@ -548,14 +556,6 @@ func (t nonAsciiTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc 
 		return j, i, transform.ErrShortDst
 	}
 
-	// Append \n to the end of stream.
-	if atEOF {
-		if j == len(dst) {
-			return j, i, transform.ErrShortDst
-		}
-		dst[len(src)] = '\n'
-	}
-
 	return j, i, nil
 }
 
@@ -586,6 +586,17 @@ func decodeTransfer(r io.Reader, label string) io.Reader {
 	}
 }
 
+func stripNonUTF8(str string) string {
+	buf := new(bytes.Buffer)
+	for _, r := range str {
+		if utf8.ValidRune(r) {
+			buf.WriteRune(r)
+		}
+	}
+
+	return buf.String()
+}
+
 // DecodeCharset detects charset of str decodes it.
 func decodeCharset(str, label string) (nstr string, err error) {
 	enc, _ := charset.Lookup(label)
@@ -598,16 +609,7 @@ func decodeCharset(str, label string) (nstr string, err error) {
 		return nstr, err
 	}
 
-	// If resulted string is not valid utf8, decode again using iso-8859-15.
-	// If that doesn't work, return error.
-	if !utf8.ValidString(nstr) {
-		if label == "iso-8859-15" {
-			return nstr, fmt.Errorf("couldn't correctly decode string using charset %q", label)
-		}
-		return decodeCharset(str, "iso-8859-15")
-	}
-
-	return nstr, nil
+	return stripNonUTF8(nstr), nil
 }
 
 // MakeID generated random Message-ID.
