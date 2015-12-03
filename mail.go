@@ -49,6 +49,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/net/html/charset"
@@ -66,7 +67,7 @@ type Message struct {
 	CC         []string
 	Subject    string
 	Date       time.Time
-	IsHTML     bool
+	IsHTML     bool // IsHTML is set when Body contains HTML converted to text.
 	HTML       string
 	Body       string
 	Parts      []Part
@@ -203,8 +204,15 @@ func ReadMessage(r io.Reader) (*Message, error) {
 		return nil, fmt.Errorf("decode body: %v", err)
 	}
 
+	emptyBody := true
+	for _, r := range m.Body {
+		if unicode.IsGraphic(r) && !unicode.IsLetter(r) {
+			emptyBody = false
+			break
+		}
+	}
 	// If body is HTML, convert it to text.
-	if len(m.Body) == 0 && len(m.HTML) > 0 {
+	if emptyBody && len(m.HTML) > 0 {
 		m.Body, err = html2text.FromString(m.HTML)
 		if err != nil {
 			return nil, err
