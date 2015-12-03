@@ -98,8 +98,7 @@ func NewMessage(from string, to []string, cc []string, subject, body string, hea
 // Using Send() on read messages can result in garbage in headers,
 // make sure to remove unnecessary ones, before sending.
 func ReadMessage(r io.Reader) (*Message, error) {
-	// TODO: do not read whole body at once.
-	rawheaders, body, err := readMessage(r)
+	rawmsg, err := mail.ReadMessage(r)
 	if err != nil {
 		return nil, err
 	}
@@ -107,21 +106,21 @@ func ReadMessage(r io.Reader) (*Message, error) {
 	m := new(Message)
 
 	// MessageID
-	if id := rawheaders.Get("Message-Id"); id != "" {
+	if id := rawmsg.Header.Get("Message-Id"); id != "" {
 		m.ID = id
 	} else {
 		m.ID = makeID()
 	}
 
 	// Date
-	if date, err := rawheaders.Date(); err == nil {
+	if date, err := rawmsg.Header.Date(); err == nil {
 		m.Date = date
 	} else {
 		m.Date = time.Now()
 	}
 
 	// Subject
-	if subject, err := decodeHeader(rawheaders.Get("Subject")); err == nil && subject != "" {
+	if subject, err := decodeHeader(rawmsg.Header.Get("Subject")); err == nil && subject != "" {
 		m.Subject = subject
 	} else if err != nil {
 		return nil, fmt.Errorf("decode header: %v", err)
@@ -130,7 +129,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 	}
 
 	// Return-Path
-	if h := rawheaders.Get("Return-Path"); h != "" {
+	if h := rawmsg.Header.Get("Return-Path"); h != "" {
 		retpath, err := decodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse return-path: %v", err)
@@ -141,7 +140,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 	}
 
 	// From
-	if h := rawheaders.Get("From"); h != "" {
+	if h := rawmsg.Header.Get("From"); h != "" {
 		from, err := decodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse from: %v", err)
@@ -152,7 +151,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 	}
 
 	// To
-	if h := rawheaders.Get("To"); h != "" {
+	if h := rawmsg.Header.Get("To"); h != "" {
 		to, err := decodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse to: %v", err)
@@ -163,7 +162,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 	}
 
 	// CC
-	if h := rawheaders.Get("Cc"); h != "" {
+	if h := rawmsg.Header.Get("Cc"); h != "" {
 		cc, err := decodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse cc: %v", err)
@@ -185,7 +184,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// Decode rest of the headers.
 	headers := make(map[string]string)
-	for k, v := range rawheaders {
+	for k, v := range rawmsg.Header {
 		switch k {
 		case "Message-Id", "Subject", "Date", "Return-Path", "From", "To", "Cc":
 			continue
@@ -205,7 +204,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 	m.Headers = headers
 
 	// Decode body.
-	if err := m.decodeBody(bytes.NewReader(body), textproto.MIMEHeader(rawheaders)); err != nil {
+	if err := m.decodeBody(rawmsg.Body, textproto.MIMEHeader(rawmsg.Header)); err != nil {
 		return nil, fmt.Errorf("decode body: %v", err)
 	}
 
@@ -448,21 +447,6 @@ func (m *Message) decodeBody(r io.Reader, h textproto.MIMEHeader) error {
 	// TODO: decide what to do with this.
 	//return fmt.Errorf("content-type without filename: %q", ct)
 	return nil
-}
-
-// readMessage reads message from r and parses headers.
-func readMessage(r io.Reader) (headers mail.Header, body []byte, err error) {
-	m, err := mail.ReadMessage(r)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	bodyBytes, err := ioutil.ReadAll(m.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return m.Header, bodyBytes, nil
 }
 
 // decodeAddress parses address line.
