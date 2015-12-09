@@ -562,6 +562,29 @@ func (t nonAsciiTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc 
 // Reset is noop.
 func (t nonAsciiTransformer) Reset() {}
 
+type newlineAppendTransformer struct{}
+
+// Transform appends newline at the end of stream.
+func (t newlineAppendTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	if len(src) > len(dst) {
+		return 0, 0, transform.ErrShortDst
+	}
+	copy(dst, src)
+
+	if atEOF {
+		if len(src) == len(dst) {
+			return len(src), len(src), transform.ErrShortDst
+		}
+		dst[len(src)] = '\n'
+		return len(src) + 1, len(src), nil
+	}
+
+	return len(src), len(src), nil
+}
+
+// Reset is noop.
+func (t newlineAppendTransformer) Reset() {}
+
 // FailReader returns error on first read.
 type failReader struct {
 	err error
@@ -578,7 +601,7 @@ func decodeTransfer(r io.Reader, label string) io.Reader {
 	case "base64", "Base64", "BASE64":
 		return base64.NewDecoder(base64.StdEncoding, transform.NewReader(r, nonAsciiTransformer{}))
 	case "quoted-printable", "Quoted-Printable", "QUOTED-PRINTABLE":
-		return quotedprintable.NewReader(transform.NewReader(r, nonAsciiTransformer{}))
+		return quotedprintable.NewReader(transform.NewReader(r, transform.Chain(nonAsciiTransformer{}, newlineAppendTransformer{})))
 	case "", "7bit", "7Bit", "7BIT", "8bit", "8Bit", "8BIT", "binary", "Binary", "BINARY":
 		return r
 	default:
