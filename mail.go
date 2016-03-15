@@ -49,7 +49,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/net/html/charset"
@@ -204,15 +203,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 		return nil, fmt.Errorf("decode body: %v", err)
 	}
 
-	emptyBody := true
-	for _, r := range m.Body {
-		if unicode.IsGraphic(r) && !unicode.IsSpace(r) {
-			emptyBody = false
-			break
-		}
-	}
-	// If body is HTML, convert it to text.
-	if emptyBody && len(m.HTML) > 0 {
+	if len(m.HTML) > 0 {
 		m.Body, err = html2text.FromString(m.HTML)
 		if err != nil {
 			return nil, err
