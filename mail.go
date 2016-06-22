@@ -130,7 +130,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// Return-Path
 	if h := rawmsg.Header.Get("Return-Path"); h != "" {
-		retpath, err := decodeAddress(h)
+		retpath, err := DecodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse return-path: %v", err)
 		}
@@ -141,7 +141,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// From
 	if h := rawmsg.Header.Get("From"); h != "" {
-		from, err := decodeAddress(h)
+		from, err := DecodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse from: %v", err)
 		}
@@ -152,7 +152,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// To
 	if h := rawmsg.Header.Get("To"); h != "" {
-		to, err := decodeAddress(h)
+		to, err := DecodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse to: %v", err)
 		}
@@ -163,7 +163,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	// CC
 	if h := rawmsg.Header.Get("Cc"); h != "" {
-		cc, err := decodeAddress(h)
+		cc, err := DecodeAddress(h)
 		if err != nil {
 			return nil, fmt.Errorf("parse cc: %v", err)
 		}
@@ -452,7 +452,7 @@ func (m *Message) decodeBody(r io.Reader, h textproto.MIMEHeader) error {
 }
 
 // decodeAddress parses address line.
-func decodeAddress(rawheader string) ([]string, error) {
+func DecodeAddress(rawheader string) ([]string, error) {
 	if rawheader == "" {
 		return nil, nil
 	}
@@ -588,12 +588,12 @@ func (r failReader) Read(b []byte) (n int, err error) {
 
 // DecodeTransfer decodes base64, quoted-printable or plain text.
 func decodeTransfer(r io.Reader, label string) io.Reader {
-	switch label {
-	case "base64", "Base64", "BASE64":
+	switch strings.ToLower(label) {
+	case "base64":
 		return base64.NewDecoder(base64.StdEncoding, transform.NewReader(r, nonAsciiTransformer{}))
-	case "quoted-printable", "Quoted-Printable", "QUOTED-PRINTABLE":
+	case "quoted-printable":
 		return quotedprintable.NewReader(transform.NewReader(r, transform.Chain(nonAsciiTransformer{}, newlineAppendTransformer{})))
-	case "", "7bit", "7Bit", "7BIT", "8bit", "8Bit", "8BIT", "binary", "Binary", "BINARY":
+	case "", "7bit", "8bit", "binary":
 		return r
 	default:
 		return failReader{fmt.Errorf("unsupported transfer encoding: %v", label)}
