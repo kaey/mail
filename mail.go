@@ -57,7 +57,7 @@ import (
 	"github.com/jaytaylor/html2text"
 )
 
-// Message represents Email message.
+// Message represents an email message.
 type Message struct {
 	ID         string
 	ReturnPath string
@@ -66,11 +66,13 @@ type Message struct {
 	CC         []string
 	Subject    string
 	Date       time.Time
-	IsHTML     bool // IsHTML is set when Body contains HTML converted to text.
-	HTML       string
-	Body       string
-	Parts      []Part
-	Headers    map[string]string
+	// IsHTML is set when Body contains HTML converted to text.
+	// Also used when marshalling to determine content-type.
+	IsHTML  bool
+	HTML    string
+	Body    string
+	Parts   []Part
+	Headers map[string]string
 }
 
 // Part represents attachment in message.
@@ -336,7 +338,12 @@ func (m *Message) Marshal() ([]byte, error) {
 		}
 		buf.WriteString(fmt.Sprintf("%v: %v\n", k, q.Encode("utf-8", v)))
 	}
-	buf.WriteString("Content-Type: text/plain; charset=utf-8;\n")
+	if m.IsHTML {
+		buf.WriteString("Content-Type: text/html; charset=utf-8;\n")
+	} else {
+		buf.WriteString("Content-Type: text/plain; charset=utf-8;\n")
+	}
+
 	buf.WriteString("Content-Transfer-Encoding: quoted-printable\n")
 	buf.WriteString("\n")
 
