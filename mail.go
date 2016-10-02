@@ -290,9 +290,9 @@ func (m *Message) Forward(from string, to []string, cc []string, body string) *M
 
 // Send sends message via 127.0.0.1:25.
 func (m *Message) Send() error {
-	b, err := m.Marshall()
+	b, err := m.Marshal()
 	if err != nil {
-		return fmt.Errorf("marshall body: %v", err)
+		return fmt.Errorf("marshal body: %v", err)
 	}
 	var recv []string
 	recv = append(recv, m.To...)
@@ -300,9 +300,9 @@ func (m *Message) Send() error {
 	return smtp.SendMail("127.0.0.1:25", nil, m.From, recv, b)
 }
 
-// Marshall builds a textual representation of a message with headers and quoted-printable body.
+// Marshal builds a textual representation of a message with headers and quoted-printable body.
 // It ignores ReturnPath, HTML and Parts.
-func (m *Message) Marshall() ([]byte, error) {
+func (m *Message) Marshal() ([]byte, error) {
 	q := mime.QEncoding
 	buf := new(bytes.Buffer)
 	buf.WriteString(fmt.Sprintf("From: <%v>\n", m.From))
@@ -451,7 +451,7 @@ func (m *Message) decodeBody(r io.Reader, h textproto.MIMEHeader) error {
 	return nil
 }
 
-// decodeAddress parses address line.
+// DecodeAddress parses address line.
 func DecodeAddress(rawheader string) ([]string, error) {
 	if rawheader == "" {
 		return nil, nil
@@ -529,10 +529,10 @@ func decodeHeader(rawheader string) (string, error) {
 	return header, nil
 }
 
-type nonAsciiTransformer struct{}
+type nonASCIITransformer struct{}
 
 // Transform removes non-ascii symbols (>127) for quotedprintable and base64.
-func (t nonAsciiTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+func (t nonASCIITransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	i := 0
 	j := 0
 	for i = 0; i < len(src) && j < len(dst); i++ {
@@ -551,7 +551,7 @@ func (t nonAsciiTransformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc 
 }
 
 // Reset is noop.
-func (t nonAsciiTransformer) Reset() {}
+func (t nonASCIITransformer) Reset() {}
 
 type newlineAppendTransformer struct{}
 
@@ -590,9 +590,9 @@ func (r failReader) Read(b []byte) (n int, err error) {
 func decodeTransfer(r io.Reader, label string) io.Reader {
 	switch strings.ToLower(label) {
 	case "base64":
-		return base64.NewDecoder(base64.StdEncoding, transform.NewReader(r, nonAsciiTransformer{}))
+		return base64.NewDecoder(base64.StdEncoding, transform.NewReader(r, nonASCIITransformer{}))
 	case "quoted-printable":
-		return quotedprintable.NewReader(transform.NewReader(r, transform.Chain(nonAsciiTransformer{}, newlineAppendTransformer{})))
+		return quotedprintable.NewReader(transform.NewReader(r, transform.Chain(nonASCIITransformer{}, newlineAppendTransformer{})))
 	case "", "7bit", "8bit", "binary":
 		return r
 	default:
